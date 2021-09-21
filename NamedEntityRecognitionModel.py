@@ -29,11 +29,21 @@ class PositionalEncoding(nn.Module):
 
 
 class NamedEntityRecognitionModel(nn.Module):
-    def __init__(self, d_model, dropout, hidden_size, num_layers, vocabulary_size):
+    def __init__(self, d_model, dropout, hidden_size, num_layers, vocabulary_size_source, vocabulary_size_target):
         super().__init__()
-        self.__token_embedding = TokenEmbedding(d_model, vocabulary_size)
+        self.__token_embedding = TokenEmbedding(d_model, vocabulary_size_source)
         self.__lstm = nn.LSTM(input_size=d_model, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout,
                               bidirectional=True)
+        self.__linear = nn.Linear(hidden_size * 2, vocabulary_size_target)
+        self.__transition = nn.Parameter(torch.rand((vocabulary_size_target, vocabulary_size_target)))
 
-    def forward(self, source):
-        return self.__lstm(self.__token_embedding(source))
+    def loss_function(self, source, target):
+        sequence_length, batch_size = source.shape
+        hidden_states, _ = self.__lstm(self.__token_embedding(source))
+        logits = self.__linear(hidden_states)
+        real_path_score = torch.zeros(batch_size)
+        for i in range(sequence_length):
+            for j in range(batch_size):
+                real_path_score[j] += logits[i, j, target[i, j]]
+                if i < sequence_length - 1:
+                    real_path_score[j] += self.__transition[target[i, j], target[i + 1, j]]
