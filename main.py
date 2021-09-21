@@ -1,3 +1,3 @@
-import torch
+from Tokenizer import Tokenizer
 
-print(torch.cuda.is_available())
+tokenizer = {'text': Tokenizer('text'), 'label': Tokenizer('label')}
