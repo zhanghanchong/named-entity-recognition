@@ -59,6 +59,31 @@ class NamedEntityRecognitionModel(nn.Module):
         self.__linear = nn.Linear(hidden_size * 2, vocabulary_size)
         self.__transition = nn.Parameter(torch.rand((vocabulary_size, vocabulary_size)))
 
+    def forward(self, source):
+        sequence_length = source.shape[0]
+        logits = self.__get_logits(source)[:, 0, :]
+        opt = [[0] * self.__vocabulary_size for _ in range(sequence_length)]
+        path = [[0] * self.__vocabulary_size for _ in range(sequence_length - 1)]
+        for i in range(self.__vocabulary_size):
+            opt[0][i] = logits[0, i].item()
+        for i in range(1, sequence_length):
+            for j in range(self.__vocabulary_size):
+                opt[i][j] = opt[i - 1][0] + logits[i, j].item() + self.__transition[0, j].item()
+                for k in range(1, self.__vocabulary_size):
+                    score = opt[i - 1][k] + logits[i, j].item() + self.__transition[k, j].item()
+                    if score > opt[i][j]:
+                        opt[i][j] = score
+                        path[i - 1][j] = k
+        token_index = 0
+        for i in range(1, self.__vocabulary_size):
+            if opt[sequence_length - 1][i] > opt[sequence_length - 1][token_index]:
+                token_index = i
+        target = [token_index] * sequence_length
+        for i in reversed(range(sequence_length - 1)):
+            token_index = path[i][token_index]
+            target[i] = token_index
+        return target
+
     def loss_function(self, source, target, device):
         sequence_length, batch_size = source.shape
         logits = self.__get_logits(source)

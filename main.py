@@ -131,7 +131,36 @@ class Gui(wx.Frame):
         self.__text_ctrl_train_logs.AppendText('Success!')
 
     def __predict(self, event):
-        pass
+        source_sentences = self.__text_ctrl_predict_source_sentences.GetValue().split('\n')
+        if not os.path.exists(FINETUNE_MODEL_FILENAME):
+            self.__text_ctrl_predict_target_sentences.SetValue('No model.')
+            return
+        self.__text_ctrl_predict_target_sentences.Clear()
+        tokenizer = {'text': Tokenizer('text'), 'label': Tokenizer('label')}
+        model = torch.load(FINETUNE_MODEL_FILENAME).to(self.__device)
+        model.eval()
+        for i in range(len(source_sentences)):
+            source_sentence = source_sentences[i]
+            if len(source_sentence) == 0:
+                if i < len(source_sentences) - 1:
+                    self.__text_ctrl_predict_target_sentences.AppendText('\n')
+                continue
+            source_words = list(source_sentence)
+            source = tokenizer['text'].get_sequence(source_words, len(source_words) + 2).to(self.__device)
+            target = model(source)
+            j = 0
+            while j < len(target):
+                label = tokenizer['label'].index_word[target[j]]
+                if label.startswith('B-'):
+                    self.__text_ctrl_predict_target_sentences.AppendText(f'{i + 1}:{j + 1} {source_sentence[j]}')
+                    label = label[2:]
+                    j += 1
+                    while j < len(target) and tokenizer['label'].index_word[target[j]] == 'I-' + label:
+                        self.__text_ctrl_predict_target_sentences.AppendText(source_sentence[j])
+                        j += 1
+                    self.__text_ctrl_predict_target_sentences.AppendText(f' {label}\n')
+                else:
+                    j += 1
 
     def __init__(self):
         super().__init__(None, title='Translator', size=(600, 400))
