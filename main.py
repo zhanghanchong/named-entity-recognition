@@ -163,7 +163,7 @@ class Gui(wx.Frame):
                     j += 1
 
     def __init__(self):
-        super().__init__(None, title='Translator', size=(600, 400))
+        super().__init__(None, title='Named Entity Recognition', size=(600, 400))
         self.Center()
         panel = wx.Panel(self)
         self.__text_ctrl_train_epochs = wx.TextCtrl(panel)
