@@ -149,13 +149,13 @@ class Gui(wx.Frame):
             source = tokenizer['text'].get_sequence(source_words, len(source_words) + 2).to(self.__device)
             target = model(source)
             j = 0
-            while j < len(target):
-                label = tokenizer['label'].index_word[target[j]]
+            while j < len(source_words):
+                label = tokenizer['label'].index_word[target[j + 1]]
                 if label.startswith('B-'):
-                    self.__text_ctrl_predict_target_sentences.AppendText(f'{i + 1}:{j + 1} {source_sentence[j]}')
+                    self.__text_ctrl_predict_target_sentences.AppendText(source_words[j])
                     label = label[2:]
                     j += 1
-                    while j < len(target) and tokenizer['label'].index_word[target[j]] == 'I-' + label:
+                    while j < len(source_words) and tokenizer['label'].index_word[target[j + 1]] == 'I-' + label:
                         self.__text_ctrl_predict_target_sentences.AppendText(source_sentence[j])
                         j += 1
                     self.__text_ctrl_predict_target_sentences.AppendText(f' {label}\n')
