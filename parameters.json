@@ -1,0 +1,14 @@
+{
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_epsilon": 1e-9,
+    "batch_size": 64,
+    "d_model": 128,
+    "dim_feedforward": 512,
+    "dropout": 0.1,
+    "hidden_size": 256,
+    "learning_rate": 1e-4,
+    "nhead": 8,
+    "num_encoder_layers": 6,
+    "num_lstm_layers": 6
+}

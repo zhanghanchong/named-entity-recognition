@@ -38,19 +38,20 @@ class NamedEntityRecognitionModel(nn.Module):
         self.__linear = nn.Linear(hidden_size * 2, vocabulary_size_target)
         self.__transition = nn.Parameter(torch.rand((vocabulary_size_target, vocabulary_size_target)))
 
-    def loss_function(self, source, target):
+    def loss_function(self, source, target, device):
         sequence_length, batch_size = source.shape
         hidden_states, _ = self.__lstm(self.__token_embedding(source))
         logits = self.__linear(hidden_states)
         total_score = logits[0]
         for i in range(1, sequence_length):
-            total_score_matrix = torch.zeros((batch_size, self.__vocabulary_size_target, self.__vocabulary_size_target))
+            total_score_matrix = torch.zeros((batch_size, self.__vocabulary_size_target, self.__vocabulary_size_target),
+                                             device=device)
             for j in range(self.__vocabulary_size_target):
                 for k in range(self.__vocabulary_size_target):
                     total_score_matrix[:, j, k] = total_score[:, j] + logits[i, :, k] + self.__transition[j, k]
             total_score = torch.logsumexp(total_score_matrix, dim=1)
         total_score = torch.logsumexp(total_score, dim=1)
-        real_path_score = torch.zeros(batch_size)
+        real_path_score = torch.zeros(batch_size, device=device)
         for i in range(sequence_length):
             for j in range(batch_size):
                 real_path_score[j] += logits[i, j, target[i, j]]
