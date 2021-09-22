@@ -8,7 +8,7 @@
     "dropout": 0.1,
     "hidden_size": 256,
     "learning_rate_pretrain": 1e-3,
-    "learning_rate_finetune": 1e-3,
+    "learning_rate_finetune": 1e-2,
     "nhead": 8,
     "num_encoder_layers": 6,
     "num_lstm_layers": 6
