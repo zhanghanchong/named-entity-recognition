@@ -6,11 +6,11 @@ from torch import nn
 class TokenEmbedding(nn.Module):
     def __init__(self, d_model, vocabulary_size):
         super().__init__()
-        self.__d_model = d_model
+        self.d_model = d_model
         self.__embedding = nn.Embedding(vocabulary_size, d_model)
 
     def forward(self, tokens):
-        return self.__embedding(tokens) * math.sqrt(self.__d_model)
+        return self.__embedding(tokens) * math.sqrt(self.d_model)
 
 
 class PositionalEncoding(nn.Module):
@@ -28,26 +28,46 @@ class PositionalEncoding(nn.Module):
         return self.__dropout(tokens_embedding + self.positional_embedding[:tokens_embedding.shape[0], :])
 
 
-class NamedEntityRecognitionModel(nn.Module):
-    def __init__(self, d_model, dropout, hidden_size, num_layers, vocabulary_size_source, vocabulary_size_target):
+class PretrainModel(nn.Module):
+    def __init__(self, d_model, dim_feedforward, dropout, max_sequence_length, nhead, num_layers, vocabulary_size):
         super().__init__()
-        self.__vocabulary_size_target = vocabulary_size_target
-        self.__token_embedding = TokenEmbedding(d_model, vocabulary_size_source)
-        self.__lstm = nn.LSTM(input_size=d_model, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout,
-                              bidirectional=True)
-        self.__linear = nn.Linear(hidden_size * 2, vocabulary_size_target)
-        self.__transition = nn.Parameter(torch.rand((vocabulary_size_target, vocabulary_size_target)))
+        self.token_embedding = TokenEmbedding(d_model, vocabulary_size)
+        self.__positional_encoding = PositionalEncoding(d_model, dropout, max_sequence_length)
+        encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout)
+        self.__transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers)
+        self.__linear = nn.Linear(d_model, vocabulary_size)
+
+    def forward(self, source, source_mask, source_padding_mask):
+        tokens_embedding = self.__positional_encoding(self.token_embedding(source))
+        outs = self.__transformer_encoder(tokens_embedding, source_mask, source_padding_mask)
+        return self.__linear(outs)
+
+
+class NamedEntityRecognitionModel(nn.Module):
+    def __get_logits(self, source):
+        with torch.no_grad():
+            tokens_embedding = self.__token_embedding(source)
+        hidden_states, _ = self.__lstm(tokens_embedding)
+        return self.__linear(hidden_states)
+
+    def __init__(self, dropout, hidden_size, num_layers, token_embedding, vocabulary_size):
+        super().__init__()
+        self.__vocabulary_size = vocabulary_size
+        self.__token_embedding = token_embedding
+        self.__lstm = nn.LSTM(input_size=token_embedding.d_model, hidden_size=hidden_size, num_layers=num_layers,
+                              dropout=dropout, bidirectional=True)
+        self.__linear = nn.Linear(hidden_size * 2, vocabulary_size)
+        self.__transition = nn.Parameter(torch.rand((vocabulary_size, vocabulary_size)))
 
     def loss_function(self, source, target, device):
         sequence_length, batch_size = source.shape
-        hidden_states, _ = self.__lstm(self.__token_embedding(source))
-        logits = self.__linear(hidden_states)
+        logits = self.__get_logits(source)
         total_score = logits[0]
         for i in range(1, sequence_length):
-            total_score_matrix = torch.zeros((batch_size, self.__vocabulary_size_target, self.__vocabulary_size_target),
+            total_score_matrix = torch.zeros((batch_size, self.__vocabulary_size, self.__vocabulary_size),
                                              device=device)
-            for j in range(self.__vocabulary_size_target):
-                for k in range(self.__vocabulary_size_target):
+            for j in range(self.__vocabulary_size):
+                for k in range(self.__vocabulary_size):
                     total_score_matrix[:, j, k] = total_score[:, j] + logits[i, :, k] + self.__transition[j, k]
             total_score = torch.logsumexp(total_score_matrix, dim=1)
         total_score = torch.logsumexp(total_score, dim=1)
